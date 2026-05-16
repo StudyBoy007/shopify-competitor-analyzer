@@ -1,0 +1,58 @@
+export const EBIKE_SPEC_FIELDS = [
+  ['product_name', '商品名称'],
+  ['product_type', '商品类型'],
+  ['current_price', '当前售价'],
+  ['compare_at_price', '划线价'],
+  ['motor_type', '电机类型'],
+  ['motor_rated_power', '电机额定功率'],
+  ['motor_peak_power', '电机峰值功率'],
+  ['torque', '扭矩'],
+  ['battery_voltage', '电池电压'],
+  ['battery_capacity_ah', '电池容量 Ah'],
+  ['battery_capacity_wh', '电池容量 Wh'],
+  ['range', '续航'],
+  ['top_speed', '最高速度'],
+  ['assist_levels', '助力等级'],
+  ['throttle', '油门'],
+  ['sensor', '传感器'],
+  ['controller', '控制器'],
+  ['display', '显示屏'],
+  ['charger', '充电器'],
+  ['charging_time', '充电时间'],
+  ['frame_material', '车架材质'],
+  ['front_fork', '前叉'],
+  ['rear_suspension', '后避震'],
+  ['brake_type', '刹车类型'],
+  ['tire_size', '轮胎尺寸'],
+  ['wheel_size', '轮径'],
+  ['gears', '变速系统'],
+  ['bike_weight', '车重'],
+  ['payload_capacity', '最大载重'],
+  ['rider_height', '适合身高'],
+  ['bike_dimensions', '车身尺寸'],
+  ['wheelbase', '轴距'],
+  ['seat_height', '座高'],
+  ['ip_rating', '防水等级'],
+  ['certification', '认证标准'],
+  ['warranty', '质保'],
+  ['other_features', '其他卖点'],
+];
+
+export const SPEC_FIELD_MAP = new Map(
+  EBIKE_SPEC_FIELDS.map(([key, label], index) => [key, { key, label, order: index + 1 }]),
+);
+
+export function emptySpecs() {
+  return EBIKE_SPEC_FIELDS.map(([key, label], index) => ({
+    key,
+    label,
+    order: index + 1,
+    value: null,
+    unit: null,
+    raw_text: null,
+    source_type: null,
+    confidence: 0,
+    conflict: false,
+    main_selling_rank: null,
+  }));
+}

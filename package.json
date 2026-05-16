@@ -1,0 +1,37 @@
+{
+  "name": "shopify-competitor-analyzer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:web": "vite",
+    "dev:local": "node server/index.js",
+    "serve": "node scripts/serve.js",
+    "stop": "node scripts/stop.js",
+    "preview:local": "vite preview --host 127.0.0.1 --port 5175 --strictPort",
+    "share": "node scripts/share.js",
+    "db:migrate": "node scripts/migrate-postgres.js",
+    "db:migrate:data": "node scripts/migrate-sqlite-to-postgres.js",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "postgres": "^3.4.9",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-router-dom": "^7.14.2",
+    "vite": "^8.0.10"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^10.2.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.5.0"
+  }
+}
