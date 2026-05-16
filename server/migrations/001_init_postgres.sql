@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS products (
   raw_json TEXT,
   is_hidden INTEGER NOT NULL DEFAULT 0,
   hidden_at TEXT,
+  is_available INTEGER NOT NULL DEFAULT 1,
+  unavailable_at TEXT,
   last_price_sync_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,

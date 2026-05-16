@@ -38,6 +38,8 @@ export function initDatabase() {
       raw_json TEXT,
       is_hidden INTEGER NOT NULL DEFAULT 0,
       hidden_at TEXT,
+      is_available INTEGER NOT NULL DEFAULT 1,
+      unavailable_at TEXT,
       last_price_sync_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -138,6 +140,8 @@ export function initDatabase() {
   ensureColumn('sites', 'extract_rule_json', 'TEXT');
   ensureColumn('products', 'is_hidden', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumn('products', 'hidden_at', 'TEXT');
+  ensureColumn('products', 'is_available', 'INTEGER NOT NULL DEFAULT 1');
+  ensureColumn('products', 'unavailable_at', 'TEXT');
   ensureColumn('spec_extractions', 'input_hash', 'TEXT');
   ensureColumn('product_specs', 'main_selling_rank', 'INTEGER');
   ensureColumn('reports', 'analysis_json', 'TEXT');
@@ -156,8 +160,9 @@ function ensureColumn(tableName, columnName, definition) {
 export function listSites() {
   return db.prepare(`
     SELECT s.*,
-      (SELECT COUNT(*) FROM products p WHERE p.site_id = s.id AND p.is_hidden = 0) AS product_count,
-      (SELECT COUNT(*) FROM products p WHERE p.site_id = s.id AND p.is_hidden = 1) AS hidden_product_count
+      (SELECT COUNT(*) FROM products p WHERE p.site_id = s.id AND p.is_available = 1 AND p.is_hidden = 0) AS product_count,
+      (SELECT COUNT(*) FROM products p WHERE p.site_id = s.id AND p.is_available = 1 AND p.is_hidden = 1) AS hidden_product_count,
+      (SELECT COUNT(*) FROM products p WHERE p.site_id = s.id AND p.is_available = 0) AS unavailable_product_count
     FROM sites s
     ORDER BY s.is_own_site DESC, s.created_at DESC
   `).all();
@@ -239,6 +244,8 @@ export function upsertProducts(siteId, products) {
       compare_at_price = excluded.compare_at_price,
       landing_page_url = excluded.landing_page_url,
       raw_json = excluded.raw_json,
+      is_available = 1,
+      unavailable_at = NULL,
       last_price_sync_at = excluded.last_price_sync_at,
       updated_at = excluded.updated_at
   `);
@@ -247,9 +254,21 @@ export function upsertProducts(siteId, products) {
   try {
     if (handles.length > 0) {
       const placeholders = handles.map(() => '?').join(',');
-      db.prepare(`DELETE FROM products WHERE site_id = ? AND handle NOT IN (${placeholders})`).run(siteId, ...handles);
+      db.prepare(`
+        UPDATE products
+        SET is_available = 0,
+          unavailable_at = COALESCE(unavailable_at, ?),
+          updated_at = ?
+        WHERE site_id = ? AND handle NOT IN (${placeholders})
+      `).run(timestamp, timestamp, siteId, ...handles);
     } else {
-      db.prepare('DELETE FROM products WHERE site_id = ?').run(siteId);
+      db.prepare(`
+        UPDATE products
+        SET is_available = 0,
+          unavailable_at = COALESCE(unavailable_at, ?),
+          updated_at = ?
+        WHERE site_id = ?
+      `).run(timestamp, timestamp, siteId);
     }
 
     for (const product of products) {
@@ -291,6 +310,8 @@ function normalizePageSize(pageSize) {
 export function listProducts({ siteId, q, ownOnly, includeHidden, page, pageSize } = {}) {
   const where = [];
   const params = [];
+
+  where.push('p.is_available = 1');
 
   if (!includeHidden) {
     where.push('p.is_hidden = 0');
@@ -375,6 +396,7 @@ export function createRelation({ ownProductId, competitorProductId, note }) {
   const own = getProduct(ownProductId);
   const competitor = getProduct(competitorProductId);
   if (!own || !competitor) throw new Error('商品不存在');
+  if (!own.is_available || !competitor.is_available) throw new Error('已下架商品不能维护竞品关系');
   if (own.is_hidden || competitor.is_hidden) throw new Error('隐藏商品不能维护竞品关系');
   if (!own.is_own_site) throw new Error('请选择我方站点下的商品作为我方商品');
   if (competitor.is_own_site) throw new Error('竞品商品不能来自我方站点');
@@ -401,6 +423,8 @@ export function listRelations({ ownProductId, q, page, pageSize } = {}) {
     where.push('r.own_product_id = ?');
     params.push(ownProductId);
   }
+  where.push('own.is_available = 1');
+  where.push('competitor.is_available = 1');
   where.push('own.is_hidden = 0');
   where.push('competitor.is_hidden = 0');
   if (q) {
@@ -463,7 +487,7 @@ export function listOwnProductsWithRelations() {
     FROM products p
     JOIN sites s ON s.id = p.site_id
     JOIN competitor_relations r ON r.own_product_id = p.id
-    WHERE s.is_own_site = 1 AND p.is_hidden = 0
+    WHERE s.is_own_site = 1 AND p.is_available = 1 AND p.is_hidden = 0
     GROUP BY p.id
     ORDER BY MAX(r.updated_at) DESC, p.updated_at DESC
   `).all();

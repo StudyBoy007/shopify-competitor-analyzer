@@ -70,13 +70,17 @@ export async function initDatabase() {
   for (const statement of migrationSql.split(';').map((item) => item.trim()).filter(Boolean)) {
     await sql.unsafe(statement);
   }
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_available INTEGER NOT NULL DEFAULT 1`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS unavailable_at TEXT`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_products_available ON products(is_available)`;
 }
 
 export async function listSites() {
   const rows = await sql`
     SELECT s.*,
-      (SELECT COUNT(*)::int FROM products p WHERE p.site_id = s.id AND p.is_hidden = 0) AS product_count,
-      (SELECT COUNT(*)::int FROM products p WHERE p.site_id = s.id AND p.is_hidden = 1) AS hidden_product_count
+      (SELECT COUNT(*)::int FROM products p WHERE p.site_id = s.id AND p.is_available = 1 AND p.is_hidden = 0) AS product_count,
+      (SELECT COUNT(*)::int FROM products p WHERE p.site_id = s.id AND p.is_available = 1 AND p.is_hidden = 1) AS hidden_product_count,
+      (SELECT COUNT(*)::int FROM products p WHERE p.site_id = s.id AND p.is_available = 0) AS unavailable_product_count
     FROM sites s
     ORDER BY s.is_own_site DESC, s.created_at DESC
   `;
@@ -144,9 +148,17 @@ export async function upsertProducts(siteId, products) {
 
   await sql.begin(async (tx) => {
     if (handles.length > 0) {
-      await tx`DELETE FROM products WHERE site_id = ${siteId} AND handle NOT IN ${tx(handles)}`;
+      await tx`
+        UPDATE products
+        SET is_available = 0, unavailable_at = COALESCE(unavailable_at, ${timestamp}), updated_at = ${timestamp}
+        WHERE site_id = ${siteId} AND handle NOT IN ${tx(handles)}
+      `;
     } else {
-      await tx`DELETE FROM products WHERE site_id = ${siteId}`;
+      await tx`
+        UPDATE products
+        SET is_available = 0, unavailable_at = COALESCE(unavailable_at, ${timestamp}), updated_at = ${timestamp}
+        WHERE site_id = ${siteId}
+      `;
     }
 
     for (const product of products) {
@@ -168,6 +180,8 @@ export async function upsertProducts(siteId, products) {
           compare_at_price = EXCLUDED.compare_at_price,
           landing_page_url = EXCLUDED.landing_page_url,
           raw_json = EXCLUDED.raw_json,
+          is_available = 1,
+          unavailable_at = NULL,
           last_price_sync_at = EXCLUDED.last_price_sync_at,
           updated_at = EXCLUDED.updated_at
       `;
@@ -180,6 +194,7 @@ export async function upsertProducts(siteId, products) {
 function buildProductWhere({ siteId, q, ownOnly, includeHidden } = {}, startIndex = 1) {
   const where = [];
   const params = [];
+  where.push('p.is_available = 1');
   if (!includeHidden) where.push('p.is_hidden = 0');
   if (siteId) {
     where.push(`p.site_id = $${startIndex + params.length}`);
@@ -262,6 +277,7 @@ export async function createRelation({ ownProductId, competitorProductId, note }
   const own = await getProduct(ownProductId);
   const competitor = await getProduct(competitorProductId);
   if (!own || !competitor) throw new Error('商品不存在');
+  if (!own.is_available || !competitor.is_available) throw new Error('已下架商品不能维护竞品关系');
   if (own.is_hidden || competitor.is_hidden) throw new Error('隐藏商品不能维护竞品关系');
   if (!own.is_own_site) throw new Error('请选择我方站点下的商品作为我方商品');
   if (competitor.is_own_site) throw new Error('竞品商品不能来自我方站点');
@@ -288,7 +304,7 @@ export async function deleteRelation(id) {
 }
 
 export async function listRelations({ ownProductId, q, page, pageSize } = {}) {
-  const where = ['own.is_hidden = 0', 'competitor.is_hidden = 0'];
+  const where = ['own.is_available = 1', 'competitor.is_available = 1', 'own.is_hidden = 0', 'competitor.is_hidden = 0'];
   const params = [];
   if (ownProductId) {
     where.push(`r.own_product_id = $${params.length + 1}`);
@@ -357,7 +373,7 @@ export async function listOwnProductsWithRelations() {
     FROM products p
     JOIN sites s ON s.id = p.site_id
     JOIN competitor_relations r ON r.own_product_id = p.id
-    WHERE s.is_own_site = 1 AND p.is_hidden = 0
+    WHERE s.is_own_site = 1 AND p.is_available = 1 AND p.is_hidden = 0
     GROUP BY p.id, s.id
     ORDER BY MAX(r.updated_at) DESC, p.updated_at DESC
   `;
