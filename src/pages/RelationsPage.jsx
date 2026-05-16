@@ -36,6 +36,10 @@ export default function RelationsPage() {
   const [relationQuery, setRelationQuery] = useState('');
   const [relationPage, setRelationPage] = useState(1);
   const [relationTotal, setRelationTotal] = useState(0);
+  const [overviewRelations, setOverviewRelations] = useState([]);
+  const [overviewQuery, setOverviewQuery] = useState('');
+  const [overviewPage, setOverviewPage] = useState(1);
+  const [overviewTotal, setOverviewTotal] = useState(0);
   const [pendingCompetitor, setPendingCompetitor] = useState(null);
   const { loading, run } = useAsync();
   const { showNotification } = useAppContext();
@@ -83,6 +87,17 @@ export default function RelationsPage() {
     setCompetitorTotal(data.total || 0);
   };
 
+  const refreshOverview = async () => {
+    const data = await api.listRelations({
+      ownSiteOnly: true,
+      q: overviewQuery,
+      page: overviewPage,
+      pageSize: PAGE_SIZE,
+    });
+    setOverviewRelations(data.relations);
+    setOverviewTotal(data.total || 0);
+  };
+
   useEffect(() => {
     refreshBase();
   }, []);
@@ -94,6 +109,10 @@ export default function RelationsPage() {
   useEffect(() => {
     refreshCompetitors();
   }, [competitorSiteId, competitorQuery, competitorPage]);
+
+  useEffect(() => {
+    refreshOverview();
+  }, [overviewQuery, overviewPage]);
 
   const addRelation = (competitorProduct, extractSpecs = true) => run(async () => {
     const result = await api.createRelation({
@@ -108,6 +127,7 @@ export default function RelationsPage() {
     }
     await refreshRelations();
     await refreshCompetitors();
+    await refreshOverview();
   }, null, extractSpecs ? '竞品参数解析中' : '竞品关系保存中');
 
   const onAddRelation = (competitorProduct) => {
@@ -121,6 +141,7 @@ export default function RelationsPage() {
   const deleteRelation = (relation) => run(async () => {
     await api.deleteRelation(relation.id);
     await refreshRelations();
+    await refreshOverview();
   }, '竞品关系已删除');
 
   const changeOwnProduct = (id) => {
@@ -256,6 +277,62 @@ export default function RelationsPage() {
           </table>
           <Pagination page={relationPage} pageSize={PAGE_SIZE} total={relationTotal} onPageChange={setRelationPage} />
         </div>
+      </section>
+
+      <section className="table-container relations-overview">
+        <div className="table-title with-tools">
+          <div>
+            <span>关系总览</span>
+            <p>当前我方站点已建立竞品关系的商品和对应竞品。</p>
+          </div>
+          <input
+            value={overviewQuery}
+            onChange={(event) => {
+              setOverviewPage(1);
+              setOverviewQuery(event.target.value);
+            }}
+            placeholder="前缀搜索我方商品、竞品商品、域名"
+          />
+        </div>
+        <table className="data-table relation-overview-table">
+          <thead>
+            <tr>
+              <th>我方商品</th>
+              <th>竞品域名</th>
+              <th>竞品商品</th>
+              <th>竞品价格</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {overviewRelations.length === 0 ? (
+              <tr><td colSpan="5"><EmptyState message="当前我方站点还没有竞品关系" /></td></tr>
+            ) : overviewRelations.map((relation) => (
+              <tr key={`overview-${relation.id}`}>
+                <td>
+                  <div className="title-cell">
+                    <strong>{relation.own_title}</strong>
+                    <span>{relation.own_handle}</span>
+                  </div>
+                </td>
+                <td>
+                  <span className="domain-pill">{relation.competitor_domain}</span>
+                </td>
+                <td>
+                  <div className="title-cell">
+                    <strong>{relation.competitor_title}</strong>
+                    <span>{relation.competitor_handle}</span>
+                  </div>
+                </td>
+                <td>{formatMoney(relation.competitor_price)}</td>
+                <td className="row-actions">
+                  <button className="text-danger" onClick={() => deleteRelation(relation)}>删除</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <Pagination page={overviewPage} pageSize={PAGE_SIZE} total={overviewTotal} onPageChange={setOverviewPage} />
       </section>
 
       <ConfirmDialog

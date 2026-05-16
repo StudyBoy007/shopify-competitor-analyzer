@@ -303,16 +303,25 @@ export async function deleteRelation(id) {
   return { success: true };
 }
 
-export async function listRelations({ ownProductId, q, page, pageSize } = {}) {
+export async function listRelations({ ownProductId, ownSiteOnly, q, page, pageSize } = {}) {
   const where = ['own.is_available = 1', 'competitor.is_available = 1', 'own.is_hidden = 0', 'competitor.is_hidden = 0'];
   const params = [];
   if (ownProductId) {
     where.push(`r.own_product_id = $${params.length + 1}`);
     params.push(ownProductId);
   }
+  if (ownSiteOnly) {
+    where.push('own_site.is_own_site = 1');
+  }
   if (q) {
-    where.push(`(competitor.title LIKE $${params.length + 1} OR competitor.handle LIKE $${params.length + 2} OR competitor_site.domain LIKE $${params.length + 3})`);
-    params.push(`${q}%`, `${q}%`, `${q}%`);
+    where.push(`(
+      own.title LIKE $${params.length + 1}
+      OR own.handle LIKE $${params.length + 2}
+      OR competitor.title LIKE $${params.length + 3}
+      OR competitor.handle LIKE $${params.length + 4}
+      OR competitor_site.domain LIKE $${params.length + 5}
+    )`);
+    params.push(`${q}%`, `${q}%`, `${q}%`, `${q}%`, `${q}%`);
   }
   const whereSql = `WHERE ${where.join(' AND ')}`;
   const shouldPaginate = page !== undefined || pageSize !== undefined;

@@ -416,20 +416,23 @@ export function deleteRelation(id) {
   return { success: true };
 }
 
-export function listRelations({ ownProductId, q, page, pageSize } = {}) {
+export function listRelations({ ownProductId, ownSiteOnly, q, page, pageSize } = {}) {
   const params = [];
   const where = [];
   if (ownProductId) {
     where.push('r.own_product_id = ?');
     params.push(ownProductId);
   }
+  if (ownSiteOnly) {
+    where.push('own_site.is_own_site = 1');
+  }
   where.push('own.is_available = 1');
   where.push('competitor.is_available = 1');
   where.push('own.is_hidden = 0');
   where.push('competitor.is_hidden = 0');
   if (q) {
-    where.push('(competitor.title LIKE ? OR competitor.handle LIKE ? OR competitor_site.domain LIKE ?)');
-    params.push(`${q}%`, `${q}%`, `${q}%`);
+    where.push('(own.title LIKE ? OR own.handle LIKE ? OR competitor.title LIKE ? OR competitor.handle LIKE ? OR competitor_site.domain LIKE ?)');
+    params.push(`${q}%`, `${q}%`, `${q}%`, `${q}%`, `${q}%`);
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const shouldPaginate = page !== undefined || pageSize !== undefined;

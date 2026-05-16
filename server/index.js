@@ -602,6 +602,7 @@ export async function handleRequest(req, res) {
     if (key === 'GET /api/relations') {
       const result = await listRelations({
         ownProductId: url.searchParams.get('ownProductId') ? Number(url.searchParams.get('ownProductId')) : null,
+        ownSiteOnly: url.searchParams.get('ownSiteOnly') === '1',
         q: url.searchParams.get('q') || '',
         page: url.searchParams.get('page') || undefined,
         pageSize: url.searchParams.get('pageSize') || undefined,

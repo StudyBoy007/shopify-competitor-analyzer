@@ -76,6 +76,7 @@ export const api = {
   listRelations: (params = {}) => {
     const search = new URLSearchParams();
     if (params.ownProductId) search.set('ownProductId', params.ownProductId);
+    if (params.ownSiteOnly) search.set('ownSiteOnly', '1');
     if (params.q) search.set('q', params.q);
     if (params.page) search.set('page', params.page);
     if (params.pageSize) search.set('pageSize', params.pageSize);
