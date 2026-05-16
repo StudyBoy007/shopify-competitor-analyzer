@@ -15,6 +15,8 @@ const navItems = [
 
 export default function Layout() {
   const { notification, globalLoading, globalLoadingMessage, currentUser, setCurrentUser } = useAppContext();
+  const roleLabel = currentUser?.role === 'admin' ? '管理员' : '普通用户';
+  const avatarLetter = currentUser?.username?.slice(0, 1)?.toUpperCase() || 'U';
 
   const logout = () => {
     clearAuthToken();
@@ -36,8 +38,14 @@ export default function Layout() {
         </nav>
         <div className="sidebar-footer">
           <ProcessingStatus active={globalLoading} message={globalLoadingMessage} />
-          <div className="sidebar-user">{currentUser?.username} · {currentUser?.role === 'admin' ? '管理员' : '普通用户'}</div>
-          <button className="sidebar-logout" onClick={logout}>退出登录</button>
+          <div className="account-card">
+            <div className="account-avatar">{avatarLetter}</div>
+            <div className="account-meta">
+              <div className="account-name">{currentUser?.username || '未登录'}</div>
+              <span className={`account-role ${currentUser?.role === 'admin' ? 'admin' : ''}`}>{roleLabel}</span>
+            </div>
+            <button className="sidebar-logout" onClick={logout}>退出</button>
+          </div>
         </div>
       </aside>
       <main className="main-content">
